@@ -1,0 +1,423 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Yo Nunca</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .table-cell { padding: 0.75rem; border-bottom: 1px solid #334155; }
+        .btn { padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: bold; transition: background-color 0.2s; cursor: pointer; }
+        .btn-primary { background-color: #22d3ee; color: #0f172a; }
+        .btn-primary:hover { background-color: #67e8f9; }
+        .btn-success { background-color: #34d399; color: #0f172a; }
+        .btn-success:hover { background-color: #6ee7b7; }
+        .btn-danger { background-color: #f87171; color: #0f172a; }
+        .btn-danger:hover { background-color: #fca5a5; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200">
+
+    <div id="app" class="container mx-auto p-4 md:p-8">
+        <h1 class="text-4xl font-bold mb-8 text-cyan-400">Panel de Administración</h1>
+
+        <!-- Login Section -->
+        <div id="login-section" class="max-w-md mx-auto bg-slate-800 p-8 rounded-lg shadow-lg">
+            <h2 class="text-2xl font-bold mb-6 text-center">Iniciar Sesión</h2>
+            <div class="text-center">
+                <button id="google-login-btn" class="btn btn-primary flex items-center justify-center w-full">
+                    <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                    Iniciar sesión con Google
+                </button>
+                <p id="login-error" class="text-red-400 mt-4 text-center"></p>
+            </div>
+        </div>
+
+        <!-- Admin Panel Section -->
+        <div id="admin-panel" class="hidden">
+            <div class="flex justify-between items-center mb-8">
+                <p>Bienvenido, <span id="user-email" class="font-bold"></span></p>
+                <button id="logout-btn" class="btn btn-danger">Cerrar Sesión</button>
+            </div>
+
+            <!-- Suggestions -->
+            <div class="mb-12">
+                <h2 class="text-3xl font-bold mb-4 border-b-2 border-slate-700 pb-2">Sugerencias Pendientes</h2>
+                <div id="suggestions-list" class="bg-slate-800 rounded-lg shadow-lg overflow-hidden">
+                    <!-- Suggestions will be rendered here -->
+                    <p class="p-4 text-slate-400">Cargando sugerencias...</p>
+                </div>
+            </div>
+
+            <!-- Stripe Product Keys -->
+            <div class="mb-12">
+                <h2 class="text-3xl font-bold mb-4 border-b-2 border-slate-700 pb-2">Claves de Productos Stripe</h2>
+                <div class="bg-slate-800 rounded-lg shadow-lg p-6 mb-6">
+                    <form id="stripe-keys-form" class="space-y-4">
+                        <div class="flex flex-col">
+                            <label for="remove-ads-key" class="mb-2">Clave para Eliminar Anuncios</label>
+                            <input type="text" id="remove-ads-key" placeholder="price_remove_ads" class="bg-slate-700 p-2 rounded border border-slate-600" required>
+                        </div>
+                        <div class="flex flex-col">
+                            <label for="premium-phrases-key" class="mb-2">Clave para Frases Premium</label>
+                            <input type="text" id="premium-phrases-key" placeholder="price_premium_phrases" class="bg-slate-700 p-2 rounded border border-slate-600" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar Claves</button>
+                    </form>
+                    <p id="stripe-keys-message" class="mt-4 text-center"></p>
+                </div>
+            </div>
+            
+
+
+            <!-- Official Phrases -->
+            <div>
+                <h2 class="text-3xl font-bold mb-4 border-b-2 border-slate-700 pb-2">Frases Oficiales</h2>
+                    <div id="phrases-count" class="mb-4 text-slate-400">
+                        Cargando conteo de frases...
+                    </div>
+                <div class="bg-slate-800 rounded-lg shadow-lg p-6 mb-6">
+                    <h3 class="text-xl font-bold mb-4">Añadir Nueva Frase</h3>
+                    <form id="add-phrase-form" class="flex gap-4 items-start">
+                        <textarea id="new-phrase-text" placeholder="Yo nunca he..." class="flex-grow bg-slate-700 p-2 rounded border border-slate-600 h-12" required></textarea>
+                        <div class="flex items-center gap-2">
+                             <input type="checkbox" id="new-phrase-premium" class="h-5 w-5 rounded">
+                             <label for="new-phrase-premium">Premium</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Añadir Frase</button>
+                    </form>
+                </div>
+                <div id="phrases-list" class="bg-slate-800 rounded-lg shadow-lg overflow-hidden">
+                    <!-- Phrases will be rendered here -->
+                    <p class="p-4 text-slate-400">Cargando frases...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import Firebase SDK
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+        import { getFirestore, collection, getDocs, doc, getDoc, addDoc, deleteDoc, setDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBx7eIcSrFFQ-TAaGM1DQJ1GNcHc1wDHkg",
+            authDomain: "yo-nunca-85b0c.firebaseapp.com",
+            projectId: "yo-nunca-85b0c",
+            storageBucket: "yo-nunca-85b0c.firebasestorage.app",
+            messagingSenderId: "814751987159",
+            appId: "1:814751987159:web:5849912e1b43a82899c792"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const firestore = getFirestore(app);
+
+        // Firestore collections
+        const suggestionsCollection = collection(firestore, 'suggestions');
+        const phrasesCollection = collection(firestore, 'phrases');
+        const configCollection = collection(firestore, 'config');
+        const adminUsersCollection = collection(firestore, 'admin_users');
+
+        // Firebase helper object
+        const firebaseHelper = {
+            auth: {
+                onAuthStateChanged: (callback) => {
+                    return onAuthStateChanged(auth, async (user) => {
+                        if (user) {
+                            const isAuthorized = await firebaseHelper.db.checkAdminAccess(user.email);
+                            if (!isAuthorized) {
+                                await signOut(auth);
+                                callback(null);
+                                alert('No tienes autorización para acceder al panel de administración.');
+                                return;
+                            }
+                        }
+                        callback(user);
+                    });
+                },
+                signInWithGoogle: () => {
+                    const provider = new GoogleAuthProvider();
+                    return signInWithPopup(auth, provider);
+                },
+                signOut: () => signOut(auth),
+            },
+            db: {
+                checkAdminAccess: async (email) => {
+                    if (!email) return false;
+                    try {
+                        const q = query(adminUsersCollection, where("email", "==", email));
+                        const querySnapshot = await getDocs(q);
+                        return !querySnapshot.empty;
+                    } catch (error) {
+                        console.error('Error verificando acceso de administrador:', error);
+                        return false;
+                    }
+                },
+                fetchSuggestions: async () => {
+                    try {
+                        const snapshot = await getDocs(suggestionsCollection);
+                        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    } catch (error) {
+                        console.error('Error obteniendo sugerencias:', error);
+                        return [];
+                    }
+                },
+                fetchPhrases: async () => {
+                    try {
+                        const snapshot = await getDocs(phrasesCollection);
+                        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    } catch (error) {
+                        console.error('Error obteniendo frases:', error);
+                        return [];
+                    }
+                },
+                fetchStripeProducts: async () => {
+                    try {
+                        const docRef = doc(configCollection, 'stripe_products');
+                        const docSnap = await getDoc(docRef);
+                        if (docSnap.exists()) return docSnap.data();
+                        return { price_remove_ads: '', price_premium_phrases: '' };
+                    } catch (error) {
+                        console.error('Error obteniendo claves de productos:', error);
+                        return { price_remove_ads: '', price_premium_phrases: '' };
+                    }
+                },
+                saveStripeProducts: async (products) => {
+                    try {
+                        await setDoc(doc(configCollection, 'stripe_products'), products);
+                        return true;
+                    } catch (error) {
+                        console.error('Error guardando claves de productos:', error);
+                        throw error;
+                    }
+                },
+                approveSuggestion: async (id) => {
+                    try {
+                        const suggestionRef = doc(suggestionsCollection, id);
+                        const suggestionSnap = await getDoc(suggestionRef);
+                        if (!suggestionSnap.exists()) throw new Error("Sugerencia no encontrada.");
+
+                        const suggestionData = suggestionSnap.data();
+                        await addDoc(phrasesCollection, { text: suggestionData.text, isPremium: false, createdAt: new Date() });
+                        await deleteDoc(suggestionRef);
+                        return true;
+                    } catch (error) {
+                        console.error('Error aprobando sugerencia:', error);
+                        throw error;
+                    }
+                },
+                deleteSuggestion: async (id) => {
+                    try {
+                        await deleteDoc(doc(suggestionsCollection, id));
+                        return true;
+                    } catch (error) {
+                        console.error('Error eliminando sugerencia:', error);
+                        throw error;
+                    }
+                },
+                addPhrase: async (text, isPremium) => {
+                    try {
+                        await addDoc(phrasesCollection, { text, isPremium: !!isPremium, createdAt: new Date() });
+                        return true;
+                    } catch (error) {
+                        console.error('Error añadiendo frase:', error);
+                        throw error;
+                    }
+                },
+                deletePhrase: async (id) => {
+                    try {
+                        await deleteDoc(doc(phrasesCollection, id));
+                        return true;
+                    } catch (error) {
+                        console.error('Error eliminando frase:', error);
+                        throw error;
+                    }
+                }
+            }
+        };
+
+        // DOM elements
+        const loginSection = document.getElementById('login-section');
+        const adminPanel = document.getElementById('admin-panel');
+        const googleLoginBtn = document.getElementById('google-login-btn');
+        const loginError = document.getElementById('login-error');
+        const userEmailSpan = document.getElementById('user-email');
+        const logoutBtn = document.getElementById('logout-btn');
+        const suggestionsList = document.getElementById('suggestions-list');
+        const phrasesList = document.getElementById('phrases-list');
+        const addPhraseForm = document.getElementById('add-phrase-form');
+        const stripeKeysForm = document.getElementById('stripe-keys-form');
+        const removeAdsKeyInput = document.getElementById('remove-ads-key');
+        const premiumPhrasesKeyInput = document.getElementById('premium-phrases-key');
+        const stripeKeysMessage = document.getElementById('stripe-keys-message');
+
+        // Render functions
+        const renderSuggestions = async () => {
+            const suggestions = await firebaseHelper.db.fetchSuggestions();
+            if (!suggestions.length) {
+                suggestionsList.innerHTML = '<p class="p-4 text-slate-400">No hay sugerencias pendientes.</p>';
+                return;
+            }
+            suggestionsList.innerHTML = `
+                <table class="w-full text-left">
+                    ${suggestions.map(s => `
+                        <tr class="hover:bg-slate-700">
+                            <td class="table-cell">${s.text}</td>
+                            <td class="table-cell text-right">
+                                <button class="btn btn-success mr-2" data-action="approve" data-id="${s.id}">Aprobar</button>
+                                <button class="btn btn-danger" data-action="reject" data-id="${s.id}">Rechazar</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </table>
+            `;
+        };
+
+        const updatePhrasesCount = async () => {
+            const phrases = await firebaseHelper.db.fetchPhrases();
+            const total = phrases.length;
+            const premium = phrases.filter(p => p.isPremium).length;
+            const normal = total - premium;
+
+            const countDiv = document.getElementById('phrases-count');
+            countDiv.textContent = `Total: ${total} frases | Premium: ${premium} | Normal: ${normal}`;
+        };
+
+        const renderPhrases = async () => {
+            const phrases = await firebaseHelper.db.fetchPhrases();
+            phrasesList.innerHTML = `
+                <table class="w-full text-left">
+                    ${phrases.map(p => `
+                        <tr class="hover:bg-slate-700">
+                            <td class="table-cell">${p.text}</td>
+                            <td class="table-cell w-32">${p.isPremium ? '<span class="bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">PREMIUM</span>' : ''}</td>
+                            <td class="table-cell text-right w-28">
+                                <button class="btn btn-danger" data-action="delete" data-id="${p.id}">Eliminar</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </table>
+            `;
+        };
+
+        const loadStripeProductKeys = async () => {
+            try {
+                const products = await firebaseHelper.db.fetchStripeProducts();
+                removeAdsKeyInput.value = products.price_remove_ads || '';
+                premiumPhrasesKeyInput.value = products.price_premium_phrases || '';
+            } catch (error) {
+                console.error('Error cargando claves de productos:', error);
+                stripeKeysMessage.textContent = 'Error al cargar las claves de productos.';
+                stripeKeysMessage.className = 'mt-4 text-center text-red-400';
+            }
+        };
+
+        const loadAdminData = () => {
+            renderSuggestions();
+            renderPhrases();
+            loadStripeProductKeys();
+            updatePhrasesCount();
+        };
+
+        // Auth state
+        firebaseHelper.auth.onAuthStateChanged(user => {
+            if (user) {
+                loginSection.classList.add('hidden');
+                adminPanel.classList.remove('hidden');
+                userEmailSpan.textContent = user.email;
+                loadAdminData();
+            } else {
+                loginSection.classList.remove('hidden');
+                adminPanel.classList.add('hidden');
+                userEmailSpan.textContent = '';
+            }
+        });
+
+        // Event listeners
+        googleLoginBtn.addEventListener('click', async () => {
+            loginError.textContent = '';
+            try {
+                await firebaseHelper.auth.signInWithGoogle();
+            } catch (error) {
+                console.error('Error de inicio de sesión con Google:', error);
+                loginError.textContent = error.message || 'Error al iniciar sesión con Google';
+            }
+        });
+
+        logoutBtn.addEventListener('click', async () => {
+            await firebaseHelper.auth.signOut();
+        });
+
+        stripeKeysForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            stripeKeysMessage.textContent = '';
+            const removeAdsKey = removeAdsKeyInput.value.trim();
+            const premiumPhrasesKey = premiumPhrasesKeyInput.value.trim();
+            if (!removeAdsKey || !premiumPhrasesKey) {
+                stripeKeysMessage.textContent = 'Ambas claves son requeridas.';
+                stripeKeysMessage.className = 'mt-4 text-center text-red-400';
+                return;
+            }
+            try {
+                await firebaseHelper.db.saveStripeProducts({ price_remove_ads: removeAdsKey, price_premium_phrases: premiumPhrasesKey });
+                stripeKeysMessage.textContent = 'Claves guardadas correctamente.';
+                stripeKeysMessage.className = 'mt-4 text-center text-green-400';
+            } catch {
+                stripeKeysMessage.textContent = 'Error al guardar las claves.';
+                stripeKeysMessage.className = 'mt-4 text-center text-red-400';
+            }
+        });
+
+        suggestionsList.addEventListener('click', async (e) => {
+            const target = e.target;
+            const action = target.dataset.action;
+            const id = target.dataset.id;
+            if (!action || !id) return;
+            target.disabled = true;
+            try {
+                if (action === 'approve') await firebaseHelper.db.approveSuggestion(id);
+                else if (action === 'reject') await firebaseHelper.db.deleteSuggestion(id);
+                loadAdminData();
+            } catch (error) {
+                console.error(error);
+            }
+        });
+
+        phrasesList.addEventListener('click', async (e) => {
+            const target = e.target;
+            const action = target.dataset.action;
+            const id = target.dataset.id;
+            if (action === 'delete' && id) {
+                if (confirm('¿Estás seguro de que quieres eliminar esta frase?')) {
+                    target.disabled = true;
+                    await firebaseHelper.db.deletePhrase(id);
+                    loadAdminData();
+                }
+            }
+        });
+
+        addPhraseForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = e.target['new-phrase-text'].value.trim();
+            const isPremium = e.target['new-phrase-premium'].checked;
+            if (text) {
+                await firebaseHelper.db.addPhrase(text, isPremium);
+                e.target.reset();
+                renderPhrases();
+            }
+        });
+    </script>
+
+</body>
+</html>
