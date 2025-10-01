@@ -91,6 +91,10 @@
                              <input type="checkbox" id="new-phrase-premium" class="h-5 w-5 rounded">
                              <label for="new-phrase-premium">Premium</label>
                         </div>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="new-phrase-adult" class="h-5 w-5 rounded">
+                        <label for="new-phrase-adult">+18 (Adulto)</label>
+                    </div>
                         <button type="submit" class="btn btn-primary">Añadir Frase</button>
                     </form>
                 </div>
@@ -203,13 +207,17 @@
                     }
                 },
                 approveSuggestion: async (id) => {
+                    // deprecated: use approveSuggestionWithAdult when possible
+                    return await this.approveSuggestionWithAdult(id, false);
+                },
+                approveSuggestionWithAdult: async (id, isAdult) => {
                     try {
                         const suggestionRef = doc(suggestionsCollection, id);
                         const suggestionSnap = await getDoc(suggestionRef);
                         if (!suggestionSnap.exists()) throw new Error("Sugerencia no encontrada.");
 
                         const suggestionData = suggestionSnap.data();
-                        await addDoc(phrasesCollection, { text: suggestionData.text, isPremium: false, createdAt: new Date() });
+                        await addDoc(phrasesCollection, { text: suggestionData.text, isPremium: false, isAdult: !!isAdult, createdAt: new Date() });
                         await deleteDoc(suggestionRef);
                         return true;
                     } catch (error) {
@@ -226,9 +234,9 @@
                         throw error;
                     }
                 },
-                addPhrase: async (text, isPremium) => {
+                addPhrase: async (text, isPremium, isAdult) => {
                     try {
-                        await addDoc(phrasesCollection, { text, isPremium: !!isPremium, createdAt: new Date() });
+                        await addDoc(phrasesCollection, { text, isPremium: !!isPremium, isAdult: !!isAdult, createdAt: new Date() });
                         return true;
                     } catch (error) {
                         console.error('Error añadiendo frase:', error);
@@ -288,10 +296,11 @@
             const phrases = await firebaseHelper.db.fetchPhrases();
             const total = phrases.length;
             const premium = phrases.filter(p => p.isPremium).length;
+            const adult = phrases.filter(p => p.isAdult).length;
             const normal = total - premium;
 
             const countDiv = document.getElementById('phrases-count');
-            countDiv.textContent = `Total: ${total} frases | Premium: ${premium} | Normal: ${normal}`;
+            countDiv.textContent = `Total: ${total} frases | Premium: ${premium} | +18: ${adult} | Normal: ${normal}`;
         };
 
         const renderPhrases = async () => {
@@ -301,7 +310,7 @@
                     ${phrases.map(p => `
                         <tr class="hover:bg-slate-700">
                             <td class="table-cell">${p.text}</td>
-                            <td class="table-cell w-32">${p.isPremium ? '<span class="bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">PREMIUM</span>' : ''}</td>
+                            <td class="table-cell w-40">${p.isPremium ? '<span class="bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full mr-2">PREMIUM</span>' : ''}${p.isAdult ? '<span class="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-full">+18</span>' : ''}</td>
                             <td class="table-cell text-right w-28">
                                 <button class="btn btn-danger" data-action="delete" data-id="${p.id}">Eliminar</button>
                             </td>
@@ -386,8 +395,13 @@
             if (!action || !id) return;
             target.disabled = true;
             try {
-                if (action === 'approve') await firebaseHelper.db.approveSuggestion(id);
-                else if (action === 'reject') await firebaseHelper.db.deleteSuggestion(id);
+                if (action === 'approve') {
+                    // Ask admin whether this phrase should be marked as +18
+                    const markAdult = confirm('¿Marcar esta frase como +18 (Adulto)? Pulsa Aceptar para sí, Cancelar para no.');
+                    await firebaseHelper.db.approveSuggestionWithAdult(id, markAdult);
+                } else if (action === 'reject') {
+                    await firebaseHelper.db.deleteSuggestion(id);
+                }
                 loadAdminData();
             } catch (error) {
                 console.error(error);
@@ -411,8 +425,9 @@
             e.preventDefault();
             const text = e.target['new-phrase-text'].value.trim();
             const isPremium = e.target['new-phrase-premium'].checked;
+            const isAdult = e.target['new-phrase-adult'].checked;
             if (text) {
-                await firebaseHelper.db.addPhrase(text, isPremium);
+                await firebaseHelper.db.addPhrase(text, isPremium, isAdult);
                 e.target.reset();
                 renderPhrases();
             }
