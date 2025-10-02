@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Yo Nunca</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .table-cell { padding: 0.75rem; border-bottom: 1px solid #334155; }
+        .btn { padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: bold; transition: background-color 0.2s; cursor: pointer; }
+        .btn-primary { background-color: #22d3ee; color: #0f172a; }
+        .btn-primary:hover { background-color: #67e8f9; }
+        .btn-success { background-color: #34d399; color: #0f172a; }
+        .btn-success:hover { background-color: #6ee7b7; }
+        .btn-danger { background-color: #f87171; color: #0f172a; }
+        .btn-danger:hover { background-color: #fca5a5; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .modal-bg { background-color: rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200">
+
+<div id="app" class="container mx-auto p-4 md:p-8">
+    <h1 class="text-4xl font-bold mb-8 text-cyan-400">Panel de Administración</h1>
+
+    <div id="login-section" class="max-w-md mx-auto bg-slate-800 p-8 rounded-lg shadow-lg">
+        <h2 class="text-2xl font-bold mb-6 text-center">Iniciar Sesión</h2>
+        <div class="text-center">
+            <button id="google-login-btn" class="btn btn-primary flex items-center justify-center w-full">
+                Iniciar sesión con Google
+            </button>
+            <p id="login-error" class="text-red-400 mt-4 text-center"></p>
+        </div>
+    </div>
+
+    <div id="admin-panel" class="hidden">
+        <div class="flex justify-between items-center mb-8">
+            <p>Bienvenido, <span id="user-email" class="font-bold"></span></p>
+            <button id="logout-btn" class="btn btn-danger">Cerrar Sesión</button>
+        </div>
+
+        <div>
+            <h2 class="text-3xl font-bold mb-4 border-b-2 border-slate-700 pb-2">Frases Oficiales</h2>
+            <div id="phrases-count" class="mb-4 text-slate-400">
+                Cargando conteo de frases...
+            </div>
+            <div class="bg-slate-800 rounded-lg shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-bold mb-4">Añadir Nueva Frase</h3>
+                <form id="add-phrase-form" class="flex gap-4 items-start">
+                    <textarea id="new-phrase-text" placeholder="Yo nunca he..." class="flex-grow bg-slate-700 p-2 rounded border border-slate-600 h-12" required></textarea>
+                    <div class="flex flex-col gap-2">
+                        <label><input type="checkbox" id="new-phrase-premium" class="h-5 w-5 rounded"> Premium</label>
+                        <label><input type="checkbox" id="new-phrase-adult" class="h-5 w-5 rounded"> +18 (Adulto)</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Añadir Frase</button>
+                </form>
+            </div>
+            <div id="phrases-list" class="bg-slate-800 rounded-lg shadow-lg overflow-hidden">
+                <p class="p-4 text-slate-400">Cargando frases...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="edit-modal" class="hidden fixed inset-0 flex items-center justify-center modal-bg z-50">
+    <div class="bg-slate-800 rounded-lg shadow-lg p-6 w-full max-w-md">
+        <h3 class="text-xl font-bold mb-4">Editar Frase</h3>
+        <form id="edit-phrase-form" class="space-y-4">
+            <textarea id="edit-phrase-text" class="w-full bg-slate-700 p-2 rounded border border-slate-600 h-20" required></textarea>
+            <div class="flex gap-4">
+                <label><input type="checkbox" id="edit-phrase-premium" class="h-5 w-5 rounded"> Premium</label>
+                <label><input type="checkbox" id="edit-phrase-adult" class="h-5 w-5 rounded"> +18 (Adulto)</label>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button type="button" id="cancel-edit-btn" class="btn btn-danger">Cancelar</button>
+                <button type="submit" class="btn btn-success">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+    import { getFirestore, collection, getDocs, doc, addDoc, deleteDoc, updateDoc, query, where, onSnapshot, writeBatch } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBx7eIcSrFFQ-TAaGM1DQJ1GNcHc1wDHkg",
+        authDomain: "yo-nunca-85b0c.firebaseapp.com",
+        projectId: "yo-nunca-85b0c",
+        storageBucket: "yo-nunca-85b0c.firebasestorage.app",
+        messagingSenderId: "814751987159",
+        appId: "1:814751987159:web:5849912e1b43a82899c792"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const phrasesCollection = collection(db, 'phrases');
+    const adminUsersCollection = collection(db, 'admin_users');
+
+    // Cache local
+    let phrasesCache = [];
+    let unsubscribeSnapshot = null;
+    let isAdmin = false;
+
+    // Verificar admin una sola vez al login
+    const checkAdminStatus = async (email) => {
+        const q = query(adminUsersCollection, where("email", "==", email));
+        const snap = await getDocs(q);
+        return !snap.empty;
+    };
+
+    // Listener en tiempo real con onSnapshot (1 lectura inicial + actualizaciones)
+    const setupPhrasesListener = () => {
+        if (unsubscribeSnapshot) unsubscribeSnapshot();
+        
+        unsubscribeSnapshot = onSnapshot(phrasesCollection, (snapshot) => {
+            phrasesCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            renderPhrases();
+        }, (error) => {
+            console.error("Error en snapshot:", error);
+        });
+    };
+
+    const renderPhrases = () => {
+        const total = phrasesCache.length;
+        const premium = phrasesCache.filter(p => p.isPremium).length;
+        const adult = phrasesCache.filter(p => p.isAdult).length;
+        const normal = total - premium;
+
+        document.getElementById('phrases-count').textContent = 
+            `Total: ${total} frases | Premium: ${premium} | +18: ${adult} | Normal: ${normal}`;
+
+        document.getElementById('phrases-list').innerHTML = `
+            <table class="w-full text-left">
+                ${phrasesCache.map(p => `
+                    <tr class="hover:bg-slate-700">
+                        <td class="table-cell">${p.text}</td>
+                        <td class="table-cell w-40">
+                            ${p.isPremium ? '<span class="bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full mr-2">PREMIUM</span>' : ''}
+                            ${p.isAdult ? '<span class="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-full">+18</span>' : ''}
+                        </td>
+                        <td class="table-cell text-right w-40">
+                            <button class="btn btn-success mr-2" data-action="edit" data-id="${p.id}">Editar</button>
+                            <button class="btn btn-danger" data-action="delete" data-id="${p.id}">Eliminar</button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </table>
+        `;
+    };
+
+    // Auth listener
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            isAdmin = await checkAdminStatus(user.email);
+            if (!isAdmin) {
+                await signOut(auth);
+                alert("No autorizado");
+                return;
+            }
+            
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('admin-panel').classList.remove('hidden');
+            document.getElementById('user-email').textContent = user.email;
+            setupPhrasesListener();
+        } else {
+            if (unsubscribeSnapshot) {
+                unsubscribeSnapshot();
+                unsubscribeSnapshot = null;
+            }
+            document.getElementById('login-section').classList.remove('hidden');
+            document.getElementById('admin-panel').classList.add('hidden');
+            phrasesCache = [];
+        }
+    });
+
+    // Login
+    document.getElementById('google-login-btn').addEventListener('click', async () => {
+        document.getElementById('login-error').textContent = '';
+        try {
+            await signInWithPopup(auth, new GoogleAuthProvider());
+        } catch (e) {
+            document.getElementById('login-error').textContent = e.message || 'Error al iniciar sesión';
+        }
+    });
+
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+
+    // Añadir frase
+    document.getElementById('add-phrase-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = e.target['new-phrase-text'].value.trim();
+        const isPremium = e.target['new-phrase-premium'].checked;
+        const isAdult = e.target['new-phrase-adult'].checked;
+        
+        if (text) {
+            await addDoc(phrasesCollection, { 
+                text, 
+                isPremium, 
+                isAdult, 
+                createdAt: new Date() 
+            });
+            e.target.reset();
+        }
+    });
+
+    // Acciones de frases
+    let currentEditId = null;
+    document.getElementById('phrases-list').addEventListener('click', async (e) => {
+        const action = e.target.dataset.action;
+        const id = e.target.dataset.id;
+        if (!action || !id) return;
+
+        if (action === 'delete') {
+            if (confirm('¿Eliminar esta frase?')) {
+                await deleteDoc(doc(phrasesCollection, id));
+            }
+        } else if (action === 'edit') {
+            const phrase = phrasesCache.find(p => p.id === id);
+            if (!phrase) return;
+            
+            currentEditId = id;
+            document.getElementById('edit-phrase-text').value = phrase.text;
+            document.getElementById('edit-phrase-premium').checked = !!phrase.isPremium;
+            document.getElementById('edit-phrase-adult').checked = !!phrase.isAdult;
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+    });
+
+    // Modal de edición
+    document.getElementById('edit-phrase-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentEditId) return;
+        
+        await updateDoc(doc(phrasesCollection, currentEditId), {
+            text: document.getElementById('edit-phrase-text').value.trim(),
+            isPremium: document.getElementById('edit-phrase-premium').checked,
+            isAdult: document.getElementById('edit-phrase-adult').checked
+        });
+        
+        document.getElementById('edit-modal').classList.add('hidden');
+        currentEditId = null;
+    });
+
+    document.getElementById('cancel-edit-btn').addEventListener('click', () => {
+        document.getElementById('edit-modal').classList.add('hidden');
+        currentEditId = null;
+    });
+</script>
+</body>
+</html>
