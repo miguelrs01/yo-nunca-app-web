@@ -82,15 +82,15 @@
 <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
     import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-    import { getFirestore, collection, getDocs, doc, addDoc, deleteDoc, updateDoc, query, where, onSnapshot, writeBatch } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, doc, addDoc, deleteDoc, updateDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
     const firebaseConfig = {
-        apiKey: "AIzaSyBx7eIcSrFFQ-TAaGM1DQJ1GNcHc1wDHkg",
-        authDomain: "yo-nunca-85b0c.firebaseapp.com",
-        projectId: "yo-nunca-85b0c",
-        storageBucket: "yo-nunca-85b0c.firebasestorage.app",
-        messagingSenderId: "814751987159",
-        appId: "1:814751987159:web:5849912e1b43a82899c792"
+        apiKey: "asdsad-TAaGM1DQJ1GNcHc1wDHkg", 
+        authDomain: "yo-nunca-asd.firebaasdseapp.com", 
+        projectId: "yo-nunca-asd", 
+        storageBucket: "yo-nunca-asd.ads.app", 
+        messagingSenderId: "asd", 
+        appId: "1:asd:web:asd" 
     };
 
     const app = initializeApp(firebaseConfig);
@@ -102,8 +102,8 @@
 
     // Cache local
     let phrasesCache = [];
-    let unsubscribeSnapshot = null;
     let isAdmin = false;
+    let currentEditId = null;
 
     // Verificar admin una sola vez al login
     const checkAdminStatus = async (email) => {
@@ -112,16 +112,11 @@
         return !snap.empty;
     };
 
-    // Listener en tiempo real con onSnapshot (1 lectura inicial + actualizaciones)
-    const setupPhrasesListener = () => {
-        if (unsubscribeSnapshot) unsubscribeSnapshot();
-        
-        unsubscribeSnapshot = onSnapshot(phrasesCollection, (snapshot) => {
-            phrasesCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-            renderPhrases();
-        }, (error) => {
-            console.error("Error en snapshot:", error);
-        });
+    // Cargar frases una vez
+    const loadPhrases = async () => {
+        const snapshot = await getDocs(phrasesCollection);
+        phrasesCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderPhrases();
     };
 
     const renderPhrases = () => {
@@ -165,12 +160,9 @@
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('admin-panel').classList.remove('hidden');
             document.getElementById('user-email').textContent = user.email;
-            setupPhrasesListener();
+
+            await loadPhrases();
         } else {
-            if (unsubscribeSnapshot) {
-                unsubscribeSnapshot();
-                unsubscribeSnapshot = null;
-            }
             document.getElementById('login-section').classList.remove('hidden');
             document.getElementById('admin-panel').classList.add('hidden');
             phrasesCache = [];
@@ -198,18 +190,19 @@
         const isAdult = e.target['new-phrase-adult'].checked;
         
         if (text) {
-            await addDoc(phrasesCollection, { 
+            const docRef = await addDoc(phrasesCollection, { 
                 text, 
                 isPremium, 
                 isAdult, 
                 createdAt: new Date() 
             });
+            phrasesCache.push({ id: docRef.id, text, isPremium, isAdult, createdAt: new Date() });
+            renderPhrases();
             e.target.reset();
         }
     });
 
     // Acciones de frases
-    let currentEditId = null;
     document.getElementById('phrases-list').addEventListener('click', async (e) => {
         const action = e.target.dataset.action;
         const id = e.target.dataset.id;
@@ -218,6 +211,8 @@
         if (action === 'delete') {
             if (confirm('¿Eliminar esta frase?')) {
                 await deleteDoc(doc(phrasesCollection, id));
+                phrasesCache = phrasesCache.filter(p => p.id !== id);
+                renderPhrases();
             }
         } else if (action === 'edit') {
             const phrase = phrasesCache.find(p => p.id === id);
@@ -236,12 +231,22 @@
         e.preventDefault();
         if (!currentEditId) return;
         
+        const newText = document.getElementById('edit-phrase-text').value.trim();
+        const newPremium = document.getElementById('edit-phrase-premium').checked;
+        const newAdult = document.getElementById('edit-phrase-adult').checked;
+
         await updateDoc(doc(phrasesCollection, currentEditId), {
-            text: document.getElementById('edit-phrase-text').value.trim(),
-            isPremium: document.getElementById('edit-phrase-premium').checked,
-            isAdult: document.getElementById('edit-phrase-adult').checked
+            text: newText,
+            isPremium: newPremium,
+            isAdult: newAdult
         });
-        
+
+        const idx = phrasesCache.findIndex(p => p.id === currentEditId);
+        if (idx > -1) {
+            phrasesCache[idx] = { ...phrasesCache[idx], text: newText, isPremium: newPremium, isAdult: newAdult };
+        }
+
+        renderPhrases();
         document.getElementById('edit-modal').classList.add('hidden');
         currentEditId = null;
     });
