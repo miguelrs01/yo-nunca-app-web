@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eliminar Cuenta - Yo Nunca</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+</head>
+<body class="bg-slate-900 text-slate-200 min-h-screen flex items-center justify-center">
+    <div class="bg-slate-800 p-8 rounded-lg shadow-lg max-w-md w-full">
+        <h1 class="text-2xl font-bold mb-4 text-cyan-400">Eliminar Cuenta - Yo Nunca</h1>
+        <p class="mb-6">Si deseas eliminar toda la información asociada a tu cuenta, pulsa el botón de abajo. Se abrirá tu aplicación de correo con un mensaje pre-rellenado para solicitar la eliminación.</p>
+        <button id="delete-btn" class="btn btn-danger w-full py-2 mt-4 bg-red-600 hover:bg-red-700 rounded font-bold">Solicitar eliminación de cuenta</button>
+        <div id="extra-info" class="text-xs text-slate-400 mt-4"></div>
+    </div>
+    <script>
+        function getQueryParam(name) {
+            const url = new URL(window.location.href);
+            return url.searchParams.get(name);
+        }
+
+        const deviceId = getQueryParam('deviceId');
+        const infoDiv = document.getElementById('extra-info');
+        if (!deviceId) {
+            infoDiv.innerHTML = 'Si accedes desde la app, tu identificador se rellenará automáticamente. Si accedes desde el navegador, abre la app y ve a Ajustes > Información del dispositivo para copiar tu identificador.';
+        } else {
+            infoDiv.innerHTML = 'Identificador detectado: <span class="font-mono text-cyan-300">' + deviceId + '</span>';
+        }
+
+        document.getElementById('delete-btn').addEventListener('click', function() {
+            const email = 'miguelrodriguezapps@gmail.com';
+            const subject = encodeURIComponent('[YO-NUNCA] Eliminar cuenta usuario');
+            let body =
+                'Se solicita eliminar mi cuenta y todos los datos asociados a mi usuario y dispositivo.';
+            if (deviceId) {
+                body += '\n\nIdentificador de dispositivo: ' + deviceId;
+            }
+            body += '\n\nPor favor, borra toda la información vinculada a este correo y dispositivo en la base de datos y servicios relacionados (frases, compras, progreso, etc).';
+            body += '\n\nNo modifiques este mensaje. Si necesitas información adicional, responde a este correo.';
+            window.location.href = `mailto:${email}?subject=${subject}&body=${encodeURIComponent(body)}`;
+        });
+    </script>
+</body>
+</html>
